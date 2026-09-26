@@ -1,0 +1,121 @@
+<USER_REQUEST>
+# OSON PRAVA — Xatoliklarni tuzatish va yaxshilash bo'yicha topshiriq
+
+Sen "OSON PRAVA" nomli haydovchilik guvohnomasi tayyorgarlik platformasi (vanilla JS + HTML + CSS, `index.html`, `js/*.js`, `css/style.css`) ustida ishlaydigan senior frontend muhandissan. Quyida sanab o'tilgan 8 ta muammoni birma-bir, mukammal sifatda hal qil. Har bir band bo'yicha: (1) sababini top, (2) to'g'ri yechim qil, (3) yechim boshqa funksiyalarni buzmasligini tekshir.
+
+---
+
+## 1. 2D Chorraha simulyatorida chapga burilish xatoligi
+**Fayl:** `js/simulator.js`, `resolveExitTransform()` va unga tegishli konstantalar (`EXIT_POINTS`, `RIGHT_OF`, `LEFT_OF`, `SLOT_FACING`).
+
+**Muammo:** To'g'riga yuruvchi mashinalar to'g'ri animatsiya qiladi, lekin chapga buriluvchi mashinada chiqish yo'nalishi (exit path) ba'zan noto'g'ri hisoblanadi.
+
+**Tахmin qilingan sabab:** `SLOT_FACING = ['N', 'S', 'W']` faqat 3 ta slot (janubdan, shimoldan, g'arbdan kiruvchi) uchun yo'nalish belgilagan, lekin ba'zi ssenariylarda mashina sharqdan (`E`) kiradi — bu holatda `SLOT_FACING[slotIndex]` `undefined` qaytaradi va funksiya `facing = 'N'`ga fallback qiladi, natijada chap/o'ng burilish noto'g'ri hisoblanadi.
+
+**Talab:**
+- `js/data.js` ichidagi barcha `simulatorScenarios` massivini ko'rib chiq va har bir ssenariyda mashinalar qaysi tomonlardan (N/S/E/W) kirishini aniqla.
+- `SLOT_FACING` massivini (yoki umuman slot→facing bog'lanishini) barcha haqiqiy holatlarni qamrab oladigan qilib to'g'irla — kerak bo'lsa har bir ssenariyda mashinaning kirish tomoni `data.js`da alohida maydon (`enterFrom: 'N'|'S'|'E'|'W'`) sifatida aniq belgilansin va `resolveExitTransform()` shu maydondan foydalansin (matnni ("chap", "o'ng") tahlil qilishga qo'shimcha, lekin kirish tomonini matndan taxmin qilmasin).
+- `LEFT_OF`/`RIGHT_OF` xaritalarini test qil: N→chap=W, W→chap=S, S→chap=E, E→chap=N (soat strelkasiga teskari) va aksincha o'ng uchun to'g'riligini tasdiqla.
+- Barcha 8 ta ssenariy (`#1`–`#8`) uchun "Play animatsiya"ni qo'lda sinab, har bir mashina to'g'ri chiqish nuqtasiga borishini tekshir.
+
+---
+
+## 2. "Nazariy darslar" kartalaridagi soxta progress va "Qayta takrorlash" yozuvi
+**Fayl:** `js/lessons.js` (progress render qismi, ~83-qator) va `js/storage.js` (~80–120-qatorlar).
+
+**Muammo:** `js/storage.js` ichida ro'yxatdan o'tmagan/yangi foydalanuvchi uchun ham darslarga standart (mock/demo) progress ma'lumotlari yozib qo'yilgan (`percentage: 95`, `percentage: 90`, `percentage: 80`, `les-1: completed:true, percent:100`, `les-2: completed:true, percent:100`, `les-3: percent:65` va h.k.). Shu sababli har qanday yangi kirgan foydalanuvchida ham darslar "tugallangan" yoki foiz bosib o'tilgan holatda ko'rinadi va tugallangan darslarda "Qayta takrorlash" tugmasi chiqadi — bu noto'g'ri.
+
+**Talab:**
+- `js/storage.js`dagi barcha demo/seed progress qiymatlarini (95%, 90%, 80%, les-1/les-2/les-3 completed holatlari va shunga o'xshash "default" ma'lumotlarni) butunlay olib tashla. Yangi foydalanuvchi uchun progress obyekti bo'sh (`{}`) yoki har bir dars uchun `{ completed: false, percent: 0 }` bo'lishi kerak.
+- `js/lessons.js`dagi karta render logikasi (`prog.completed ? 'Qayta takrorlash' : (prog.percent > 0 ? 'Davom etish' : 'Boshlash')`) o'zi to'g'ri — muammo faqat noto'g'ri boshlang'ich ma'lumotda edi. Progress faqat foydalanuvchi ro'yxatdan o'tib, darsni haqiqatan boshlab/tugatgandan keyin `storage`ga yozilishini ta'minla (ya'ni progress state faqat real user action orqali yangilansin, hech qanday holatda oldindan to'ldirilmasin).
+- Bu tuzatishni umumiy tamoyil sifatida qara: loyihadagi **har qanday** joyda (darslar, testlar, dashboard, streak va h.k.) hardcoded/demo progress bo'lsa — hammasini top va olib tashla (pastdagi 4-bandga ham bog'liq).
+
+---
+
+## 3. Ro'yxatdan o'tmagan/yangi foydalanuvchi uchun umuman "default" holat
+**Fayllar:** `js/storage.js`, `js/auth.js`, ehtimol `js/app.js`.
+
+**Muammo:** Yangi (hali ro'yxatdan o'tmagan yoki yangi ro'yxatdan o'tgan) foydalanuvchida ham sayt bo'ylab turli foizlar, statistikalar, "tugallangan" belgilari avtomatik chiqib qolyapti. Bu startup loyiha uchun noto'g'ri — har bir real foydalanuvchi o'z shaxsiy, boshlang'ich (0%) holatidan boshlashi kerak.
+
+**Talab:**
+- Butun kodni skanerdan o'tkazib, `localStorage`/`storage.js` orqali oldindan to'ldirilgan (seed/demo/mock) har qanday ma'lumotni top: progress foizlari, "eng yaxshi ball", "kunlik streak", "oxirgi test natijalari", yutuq nishonlari va h.k.
+- Yangi user session yaratilganda (ro'yxatdan o'tish yoki birinchi kirish paytida) barcha statistik qiymatlar 0/bo'sh/"Boshlanmagan" holatida boshlanishini ta'minla.
+- Faqat foydalanuvchi haqiqatan test yechgan, dars ko'rgan yoki imtihon topshirgandan keyingina tegishli qiymatlar `storage`ga yozilib, UI'da ko'rinsin.
+- Eslatma: mavjud demo/test uchun ishlatilgan sample ma'lumotlarni butunlay o'chirmasdan, ularni faqat "agar developer/demo rejimi yoqilgan bo'lsa" degan alohida flag orqali ishlatish mumkin, lekin production/asosiy oqimda bu flag har doim `false`/o'chirilgan bo'lishi kerak.
+
+---
+
+## 4. Dashboard sahifasini ham to'liq default holatga tushirish
+**Fayl:** ekran skrinshotidagi `#dashboard` bo'limi (`index.html` + tegishli JS, `js/ui.js`/`js/app.js` ichida dashboard render funksiyasi).
+
+**Muammo:** "Dashboard" sahifasi barcha foydalanuvchilar uchun bir xil (Tugallangan darslar: 2/10, O'rtacha natija: 88%, Eng yaxshi ball: 95%, Kunlik streak: 1 kun va h.k.) ko'rinadi — bu 2-3-bandlardagi demo ma'lumot muammosining bir qismi.
+
+**Talab:**
+- Dashboarddagi barcha statistik bloklarni (Tugallangan darslar, O'rtacha natija, Eng yaxshi ball, Kunlik streak, "Bugungi maqsad", "Oxirgi test natijalari", "Yutuq nishonlari") real, foydalanuvchiga xos `storage`dagi ma'lumotdan o'qiydigan qil.
+- Yangi foydalanuvchi uchun: 0/10 dars, o'rtacha natija "—" yoki "Hali yo'q", eng yaxshi ball "—", streak "0 kun", "Oxirgi test natijalari" jadvali bo'sh holat (`empty state` — masalan "Hali test topshirmagansiz, Testlar bo'limiga o'ting" degan taklif bilan) ko'rsatilsin.
+- Bu tuzatish real ko'p foydalanuvchili (multi-user) startup mahsulot mantig'iga mos bo'lishi shart — har bir user faqat o'z natijalarini ko'rishi kerak.
+
+---
+
+## 5. AI Murabbiy (AI Tutor) javoblarini sifat jihatidan yaxshilash
+**Fayl:** `js/ai-tutor.js`.
+
+**Muammo:** AI oddiy/qisqa savollarga yaxshi javob beradi, lekin murakkab yoki chuqurroq tushuntirish talab qiladigan savollarga ham xuddi shu "tayyor shablon" javobni qaytaradi — javob savol murakkabligiga moslashmayapti.
+
+**Talab:**
+- `js/ai-tutor.js` ichidagi javob generatsiya logikasini ko'rib chiq: agar javoblar statik shablon/if-else zanjiri asosida bo'lsa, buni dinamik (masalan, savol matnini tahlil qilib, tegishli kontekst — YHQ moddalari, jarima summalari, chorraha qoidalari — bilan boyitilgan) javob generatsiyasiga o'tkaz.
+- Agar loyihada allaqachon tashqi LLM API (masalan, Anthropic Claude API) bilan integratsiya mavjud yoki mo'ljallangan bo'lsa, murakkab savollar uchun to'liqroq systemPrompt/context yubor: foydalanuvchi savolining murakkabligini aniqlab (masalan so'zlar soni, kalit so'zlar — "nega", "sabab", "farqi", "qanday hisoblanadi" kabi so'rovlar murakkab hisoblansin), shunga qarab javob uzunligi/chuqurligini moslashtir.
+- Agar hozircha faqat local/rule-based javob tizimi bo'lsa — savollar bazasini kengaytir va har bir mavzuga (svetofor, imtiyoz belgilari, jarimalar, tezlik chegaralari va h.k.) alohida batafsil javob shablonlari qo'sh, umumiy "bitta standart javob"ni yo'q qil.
+- Maqsad: foydalanuvchi qanchalik aniq/murakkab savol bersa, AI javobi ham shunchalik aniq, tushuntirilgan va foydali bo'lishi kerak — bir xil generik javob barcha savollarga qaytarilmasin.
+
+---
+
+## 6. "Testlar" sahifasida savollar "yuklanmoqda..." holatida qotib qolishi
+**Fayl:** `js/tests.js`, `js/data.js` (`window.OSON_DATA.questions`), `index.html` (~1879, 2077-qatorlardagi "Savol matni yuklanmoqda..." placeholder).
+
+**Muammo:** Savollar aslida `js/data.js` ichida statik array (`window.OSON_DATA.questions`) sifatida saqlangan — ya'ni hozir ham server fetch emas, local array orqali olib kelinadi. Lekin baribir UI'da "Savol matni yuklanmoqda..." holatida qotib qolyapti, ya'ni bu server-latency muammosi emas, balki render/init logikasidagi xatolik yoki race condition.
+
+**Talab:**
+- `js/tests.js` ichida savolni ekranga chiqaradigan funksiyani (render/init) toping va sahifa yuklanganda `window.OSON_DATA` obyekti tayyor bo'lishidan oldin chaqirilib qolayotganini (script yuklash tartibi — `index.html`da `data.js` `tests.js`dan keyin yuklanayotgan bo'lishi mumkin) tekshiring.
+- Konsolda (`console.error`) xato chiqayotganini aniqlang — ehtimol DOM elementga murojaat qilinganda element hali mavjud bo'lmasligi yoki `selectedQuestions` massivi bo'sh qaytishi mumkin.
+- Savollar albatta **local array** (`js/data.js`) orqali kelishini tasdiqla va bu holatni saqlab qol — chunki bu yondashuv to'g'ri (server kerak emas, chunki barcha foydalanuvchi uchun bir xil savollar to'plami statik bo'lishi mumkin). Faqat bug'ni — nima uchun UI array tayyor bo'lsa ham "yuklanmoqda..." holatida qolib ketayotganini — top va tuzat.
+- Tuzatgandan so'ng, sahifani ochib "Savol 1/20" (yoki nechta savol tanlangan bo'lsa) to'g'ri ko'rinishini, "Keyingi savol"/"Oldingi" tugmalari ishlashini tekshir.
+
+---
+
+## 7. Favicon va header logotipini yaxshilash
+**Fayllar:** `manifest.json`, `index.html` `<head>` qismidagi `<link rel="icon">`, header logotip SVG/elementi (`index.html` header bo'limi).
+
+**Muammo:** Hozirgi favicon va header ikonkasi sifatsiz/"dabdala" ko'rinishda.
+
+**Talab:**
+- Sayt nomi "OSON PRAVA" mavzusiga mos (yo'l, руль/rul, yo'l belgisi, svetofor kabi motivlardan biriga asoslangan), zamonaviy, minimalist SVG-based ikon/logotip yasa (mavjud rang sxemasi — ko'k/sariq/to'q ko'k fon — bilan mos keladigan qilib).
+- Bir nechta o'lchamda favicon fayllarini generatsiya qil: 16x16, 32x32, 180x180 (apple-touch-icon), 512x512 (PWA uchun, `manifest.json`dagi `icons` massivini shu fayllar bilan yangila).
+- Header'dagi logotipni ham xuddi shu yangi ikon bilan almashtir, SVG sifatida inline yoki `<img>` orqali, retina ekranlarda ham aniq ko'rinadigan qilib joylashtir.
+
+---
+
+## 8. Rasmiy sertifikatga saytning muhri (pechat) qo'shish
+**Fayl:** `js/certificate.js`, `js/profile.js` (sertifikat generatsiya/render qismi).
+
+**Muammo:** Foydalanuvchi profil sahifasidan "Rasmiy Sertifikat" so'raganda yaratiladigan sertifikatda hozircha saytning rasmiy muhri (pechat) yo'q — buni qo'shish kerak.
+
+**Talab:**
+- Sertifikat shablonining pastki qismiga (masalan sertifikat ID va QR-kod joylashgan hudud yaqiniga, tegishli joyga) doira shaklidagi, "pechat" ko'rinishidagi elementi qo'sh: markazida saytning yangi logotipi (7-banddagi yangi ikon), atrofida aylana bo'ylab matn — masalan "OSON PRAVA • MILLIY HAYDOVCHILIK TA'LIMI MARKAZI •" — va pastda tasdiqlash sanasi joylashsin.
+- Bu muhr elementini CSS/SVG orqali "rasmiy pechat" uslubida (biroz noaniq/transparent qizil yoki ko'k rangda, biroz burilgan/rotated, real muhr effekti beradigan qilib — masalan `opacity: 0.85`, `transform: rotate(-8deg)`, dashed/dotted ichki chegara) yasa.
+- Sertifikat "Chop etish / PDF saqlash" qilinganda ham (print CSS orqali) bu muhr elementi joyida qolishini va PDF/print chiqishida sifatli ko'rinishini tekshir.
+- Muhr statik rasm emas, balki SVG/CSS orqali generatsiya qilinsin — shunda u har xil ekran o'lchamlarida va chop etishda sifatli chiqadi.
+
+---
+
+## Umumiy talablar
+- Har bir tuzatishdan so'ng brauzerda amalda tekshirib chiq (chorraha simulyatori — barcha 8 ssenariy; darslar — yangi va progress qilingan user holatlari; testlar — savollar to'liq yuklanishi; dashboard — bo'sh holat; AI Murabbiy — oddiy va murakkab savollar bilan; sertifikat — chop etish ko'rinishi).
+- Kodni tuzatishda mavjud loyihaning umumiy uslubi, o'zbek tilidagi matnlar va joriy dizayn tizimini (ranglar, shrift, komponent uslublari) buzmasdan saqlab qol.
+- Har bir band bo'yicha nima o'zgartirilgani va nega haqida qisqacha izoh (commit message yoki summary) yoz.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-15T16:55:54+05:00.
+</ADDITIONAL_METADATA>
+<USER_SETTINGS_CHANGE>
+The user changed setting `Model Selection` from None to Claude Opus 4.6 (Thinking). No need to comment on this change if the user doesn't ask about it. If reporting what model you are, please use a human readable name instead of the exact string.
+</USER_SETTINGS_CHANGE>
